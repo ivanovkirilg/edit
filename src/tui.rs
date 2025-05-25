@@ -1958,6 +1958,64 @@ impl<'a> Context<'a, '_> {
         self.button_activated()
     }
 
+    pub fn accelerated_button(
+        &mut self,
+        classname: &'static str,
+        accelerator: char,
+        text: &str,
+    ) -> bool {
+        self.styled_label_begin(classname);
+        self.attr_focusable();
+        if self.is_focused() {
+            self.attr_reverse();
+        }
+
+        let mut off = text.len();
+
+        for (i, c) in text.bytes().enumerate() {
+            // Perfect match (uppercase character) --> stop
+            if c as char == accelerator {
+                off = i;
+                break;
+            }
+            // Inexact match (lowercase character) --> use first hit
+            if (c & !0x20) as char == accelerator && off == text.len() {
+                off = i;
+            }
+        }
+
+        if off < text.len() {
+            // Add an underline to the accelerator.
+            self.styled_label_add_text(&text[..off]);
+            self.styled_label_set_attributes(Attributes::Underlined);
+            self.styled_label_add_text(&text[off..off + 1]);
+            self.styled_label_set_attributes(Attributes::None);
+            self.styled_label_add_text(&text[off + 1..]);
+        } else {
+            // Add the accelerator in parentheses and underline it.
+            let ch = accelerator as u8;
+            self.styled_label_add_text(text);
+            self.styled_label_add_text("(");
+            self.styled_label_set_attributes(Attributes::Underlined);
+            self.styled_label_add_text(unsafe { str_from_raw_parts(&ch, 1) });
+            self.styled_label_set_attributes(Attributes::None);
+            self.styled_label_add_text(")");
+        }
+
+        self.styled_label_end();
+
+        let clicked =
+            self.button_activated() || self.consume_shortcut(InputKey::new(accelerator as u32));
+
+        if clicked {
+            // TODO: This should reassign the previous focused path.
+            self.needs_rerender();
+            Tui::clean_node_path(&mut self.tui.focused_node_path);
+        }
+
+        clicked
+    }
+
     /// Creates a checkbox with the given text.
     /// Returns true if the checkbox was activated.
     pub fn checkbox(&mut self, classname: &'static str, text: &str, checked: &mut bool) -> bool {
