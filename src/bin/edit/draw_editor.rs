@@ -239,22 +239,15 @@ pub fn draw_handle_wants_close(ctx: &mut Context, state: &mut State) {
             ctx.table_next_row();
             ctx.inherit_focus();
 
-            if ctx.button("yes", loc(LocId::UnsavedChangesDialogYes)) {
+            if ctx.accelerated_button("yes", 'S', loc(LocId::UnsavedChangesDialogYes)) {
                 action = Action::Save;
             }
             ctx.inherit_focus();
-            if ctx.button("no", loc(LocId::UnsavedChangesDialogNo)) {
+            if ctx.accelerated_button("no", 'N', loc(LocId::UnsavedChangesDialogNo)) {
                 action = Action::Discard;
             }
-            if ctx.button("cancel", loc(LocId::Cancel)) {
+            if ctx.accelerated_button("cancel", 'C', loc(LocId::Cancel)) {
                 action = Action::Cancel;
-            }
-
-            // TODO: This should highlight the corresponding letter in the label.
-            if ctx.consume_shortcut(vk::S) {
-                action = Action::Save;
-            } else if ctx.consume_shortcut(vk::N) {
-                action = Action::Discard;
             }
         }
         ctx.table_end();
@@ -265,7 +258,7 @@ pub fn draw_handle_wants_close(ctx: &mut Context, state: &mut State) {
 
     match action {
         Action::None => return,
-        Action::Save => state.wants_save = true,
+        Action::Save => state.wants_save = true, // TODO also close
         Action::Discard => state.documents.remove_active(),
         Action::Cancel => state.wants_exit = false,
     }
