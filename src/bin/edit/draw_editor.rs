@@ -239,14 +239,14 @@ pub fn draw_handle_wants_close(ctx: &mut Context, state: &mut State) {
             ctx.table_next_row();
             ctx.inherit_focus();
 
-            if ctx.accelerated_button("yes", 'S', loc(LocId::UnsavedChangesDialogYes)) {
+            if ctx.button_with_accelerator("yes", 'S', loc(LocId::UnsavedChangesDialogYes)) {
                 action = Action::Save;
             }
             ctx.inherit_focus();
-            if ctx.accelerated_button("no", 'N', loc(LocId::UnsavedChangesDialogNo)) {
+            if ctx.button_with_accelerator("no", 'N', loc(LocId::UnsavedChangesDialogNo)) {
                 action = Action::Discard;
             }
-            if ctx.accelerated_button("cancel", 'C', loc(LocId::Cancel)) {
+            if ctx.button_with_accelerator("cancel", 'C', loc(LocId::Cancel)) {
                 action = Action::Cancel;
             }
         }

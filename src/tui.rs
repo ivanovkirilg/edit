@@ -1914,62 +1914,9 @@ impl<'a> Context<'a, '_> {
         content.text.push_str(text);
     }
 
-    /// Ends the current label block.
-    pub fn styled_label_end(&mut self) {
-        {
-            let mut last_node = self.tree.last_node.borrow_mut();
-            let NodeContent::Text(content) = &last_node.content else {
-                return;
-            };
-
-            let cursor = unicode::MeasurementConfig::new(&content.text.as_bytes())
-                .goto_visual(Point { x: CoordType::MAX, y: 0 });
-            last_node.intrinsic_size.width = cursor.visual_pos.x;
-            last_node.intrinsic_size.height = 1;
-            last_node.intrinsic_size_set = true;
-        }
-
-        self.block_end();
-    }
-
-    /// Sets the overflow behavior of the current label.
-    pub fn attr_overflow(&mut self, overflow: Overflow) {
-        let mut last_node = self.tree.last_node.borrow_mut();
-        let NodeContent::Text(content) = &mut last_node.content else {
-            return;
-        };
-
-        content.overflow = overflow;
-    }
-
-    /// Creates a button with the given text.
-    /// Returns true if the button was activated.
-    pub fn button(&mut self, classname: &'static str, text: &str) -> bool {
-        self.styled_label_begin(classname);
-        self.attr_focusable();
-        if self.is_focused() {
-            self.attr_reverse();
-        }
-        self.styled_label_add_text("[");
-        self.styled_label_add_text(text);
-        self.styled_label_add_text("]");
-        self.styled_label_end();
-
-        self.button_activated()
-    }
-
-    pub fn accelerated_button(
-        &mut self,
-        classname: &'static str,
-        accelerator: char,
-        text: &str,
-    ) -> bool {
-        self.styled_label_begin(classname);
-        self.attr_focusable();
-        if self.is_focused() {
-            self.attr_reverse();
-        }
-
+    /// Adds text to the current label, underlining the `accelerator` character
+    /// if present, else appending it in parentheses.
+    pub fn styled_label_add_text_with_accelerator(&mut self, text: &str, accelerator: char) {
         let mut off = text.len();
 
         for (i, c) in text.bytes().enumerate() {
@@ -2001,19 +1948,71 @@ impl<'a> Context<'a, '_> {
             self.styled_label_set_attributes(Attributes::None);
             self.styled_label_add_text(")");
         }
+    }
 
-        self.styled_label_end();
+    /// Ends the current label block.
+    pub fn styled_label_end(&mut self) {
+        {
+            let mut last_node = self.tree.last_node.borrow_mut();
+            let NodeContent::Text(content) = &last_node.content else {
+                return;
+            };
 
-        let clicked =
-            self.button_activated() || self.consume_shortcut(InputKey::new(accelerator as u32));
-
-        if clicked {
-            // TODO: This should reassign the previous focused path.
-            self.needs_rerender();
-            Tui::clean_node_path(&mut self.tui.focused_node_path);
+            let cursor = unicode::MeasurementConfig::new(&content.text.as_bytes())
+                .goto_visual(Point { x: CoordType::MAX, y: 0 });
+            last_node.intrinsic_size.width = cursor.visual_pos.x;
+            last_node.intrinsic_size.height = 1;
+            last_node.intrinsic_size_set = true;
         }
 
-        clicked
+        self.block_end();
+    }
+
+    /// Sets the overflow behavior of the current label.
+    pub fn attr_overflow(&mut self, overflow: Overflow) {
+        let mut last_node = self.tree.last_node.borrow_mut();
+        let NodeContent::Text(content) = &mut last_node.content else {
+            return;
+        };
+
+        content.overflow = overflow;
+    }
+
+    fn styled_button_label_begin(&mut self, classname: &'static str) {
+        self.styled_label_begin(classname);
+        self.attr_focusable();
+        if self.is_focused() {
+            self.attr_reverse();
+        }
+        self.styled_label_add_text("[");
+    }
+
+    fn styled_button_label_end(&mut self) {
+        self.styled_label_add_text("]");
+        self.styled_label_end();
+    }
+
+    /// Creates a button with the given text.
+    /// Returns true if the button was activated.
+    pub fn button(&mut self, classname: &'static str, text: &str) -> bool {
+        self.styled_button_label_begin(classname);
+        self.styled_label_add_text(text);
+        self.styled_button_label_end();
+
+        self.button_activated()
+    }
+
+    pub fn button_with_accelerator(
+        &mut self,
+        classname: &'static str,
+        accelerator: char,
+        text: &str,
+    ) -> bool {
+        self.styled_button_label_begin(classname);
+        self.styled_label_add_text_with_accelerator(text, accelerator);
+        self.styled_button_label_end();
+
+        self.button_activated() || self.consume_shortcut(InputKey::new(accelerator as u32))
     }
 
     /// Creates a checkbox with the given text.
@@ -3210,42 +3209,12 @@ impl<'a> Context<'a, '_> {
             return;
         }
 
-        let mut off = text.len();
-
-        for (i, c) in text.bytes().enumerate() {
-            // Perfect match (uppercase character) --> stop
-            if c as char == accelerator {
-                off = i;
-                break;
-            }
-            // Inexact match (lowercase character) --> use first hit
-            if (c & !0x20) as char == accelerator && off == text.len() {
-                off = i;
-            }
-        }
-
         self.styled_label_begin("label");
         if let Some(checked) = checked {
             self.styled_label_add_text(if checked { "▣ " } else { "  " });
         }
 
-        if off < text.len() {
-            // Add an underline to the accelerator.
-            self.styled_label_add_text(&text[..off]);
-            self.styled_label_set_attributes(Attributes::Underlined);
-            self.styled_label_add_text(&text[off..off + 1]);
-            self.styled_label_set_attributes(Attributes::None);
-            self.styled_label_add_text(&text[off + 1..]);
-        } else {
-            // Add the accelerator in parentheses and underline it.
-            let ch = accelerator as u8;
-            self.styled_label_add_text(text);
-            self.styled_label_add_text("(");
-            self.styled_label_set_attributes(Attributes::Underlined);
-            self.styled_label_add_text(unsafe { str_from_raw_parts(&ch, 1) });
-            self.styled_label_set_attributes(Attributes::None);
-            self.styled_label_add_text(")");
-        }
+        self.styled_label_add_text_with_accelerator(text, accelerator);
 
         self.styled_label_end();
         self.attr_padding(Rect { left: 0, top: 0, right: 2, bottom: 0 });
