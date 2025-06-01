@@ -295,12 +295,23 @@ fn print_version() {
 }
 
 fn draw(ctx: &mut Context, state: &mut State) {
+    if ctx.consume_chord(kbmod::CTRL | vk::P, kbmod::CTRL | vk::W) {
+        state.wants_close_all = true;
+    } else if let Some(_key) = ctx.keyboard_input()
+        && let Some(_chord) = ctx.chord_starter()
+    {
+        ctx.cancel_chord();
+    }
+
     draw_menubar(ctx, state);
     draw_editor(ctx, state);
     draw_statusbar(ctx, state);
 
     if state.wants_close {
         draw_handle_wants_close(ctx, state);
+    }
+    if state.wants_close_all {
+        draw_handle_wants_close_all(ctx, state);
     }
     if state.wants_exit {
         draw_handle_wants_exit(ctx, state);
@@ -343,8 +354,10 @@ fn draw(ctx: &mut Context, state: &mut State) {
             state.wants_file_picker = StateFilePicker::SaveAs;
         } else if key == kbmod::CTRL | vk::W {
             state.wants_close = true;
-        } else if key == kbmod::CTRL | vk::P {
+        } else if key == kbmod::CTRL | vk::J {
             state.wants_document_picker = true;
+        } else if key == kbmod::CTRL | vk::P {
+            ctx.start_chord(kbmod::CTRL | vk::P);
         } else if key == kbmod::CTRL | vk::Q {
             state.wants_exit = true;
         } else if key == kbmod::CTRL | vk::G {
@@ -367,7 +380,7 @@ fn draw(ctx: &mut Context, state: &mut State) {
     }
 }
 
-fn draw_handle_wants_exit(_ctx: &mut Context, state: &mut State) {
+fn draw_handle_wants_close_all(_ctx: &mut Context, state: &mut State) {
     while let Some(doc) = state.documents.active() {
         if doc.buffer.borrow().is_dirty() {
             state.wants_close = true;
@@ -375,6 +388,10 @@ fn draw_handle_wants_exit(_ctx: &mut Context, state: &mut State) {
         }
         state.documents.remove_active();
     }
+}
+
+fn draw_handle_wants_exit(ctx: &mut Context, state: &mut State) {
+    draw_handle_wants_close_all(ctx, state);
 
     if state.documents.len() == 0 {
         state.exit = true;

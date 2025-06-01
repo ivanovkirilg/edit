@@ -170,6 +170,10 @@ pub fn draw_statusbar(ctx: &mut Context, state: &mut State) {
             ctx.label("dirty", "*");
         }
 
+        if let Some(_chord) = ctx.chord_starter() {
+            ctx.label("classname", "🎹");
+        }
+
         ctx.block_begin("filename-container");
         ctx.attr_intrinsic_size(Size { width: COORD_TYPE_SAFE_MAX, height: 1 });
         {

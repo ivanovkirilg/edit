@@ -351,6 +351,8 @@ pub struct Tui {
     /// The node ID of the node that was first clicked on
     /// in a double/triple click series.
     first_click_target: u64,
+    /// What key (combination) started a chord the previous frame, if any
+    chord_starter: Option<InputKey>,
 
     /// Path to the currently focused node.
     focused_node_path: Vec<u64>,
@@ -410,6 +412,7 @@ impl Tui {
             mouse_down_node_path: Vec::with_capacity(16),
             first_click_position: Point::MIN,
             first_click_target: 0,
+            chord_starter: None,
 
             focused_node_path: Vec::with_capacity(16),
             focused_node_for_scrolling: ROOT_ID,
@@ -658,6 +661,8 @@ impl Tui {
             }
         }
 
+        // let input_chord_starter = self.chord_starter.take();
+
         if !input_consumed {
             // Every time there's input, we naturally need to re-render at least once.
             self.settling_have = 0;
@@ -674,6 +679,7 @@ impl Tui {
 
             input_text,
             input_keyboard,
+            // input_chord_starter,
             input_mouse_modifiers,
             input_mouse_click,
             input_scroll_delta,
@@ -809,6 +815,18 @@ impl Tui {
     fn clean_node_path(path: &mut Vec<u64>) {
         Self::build_node_path(None, path);
     }
+
+    // pub fn start_chord(&mut self, key: InputKey) {
+    //     debug_assert!(
+    //         self.chord_starter.is_none(),
+    //         "You can't start a second chord, clear it first!"
+    //     );
+    //     self.chord_starter = Some(key);
+    // }
+
+    // pub fn cancel_chord(&mut self) {
+    //     self.chord_starter = None;
+    // }
 
     /// After you finished processing all input, continue redrawing your UI until this returns false.
     pub fn needs_settling(&mut self) -> bool {
@@ -1294,6 +1312,7 @@ pub struct Context<'a, 'input> {
     input_text: Option<InputText<'input>>,
     /// Current keyboard input, if any.
     input_keyboard: Option<InputKey>,
+    // input_chord_starter: Option<InputKey>,
     input_mouse_modifiers: InputKeyMod,
     input_mouse_click: CoordType,
     /// By how much the mouse wheel was scrolled since the last frame.
@@ -1372,6 +1391,22 @@ impl<'a> Context<'a, '_> {
             self.tui.clipboard_generation = self.tui.clipboard_generation.wrapping_add(1);
             self.needs_rerender();
         }
+    }
+
+    pub fn start_chord(&mut self, key: InputKey) {
+        debug_assert!(
+            self.tui.chord_starter.is_none(),
+            "You can't start a second chord, clear it first!"
+        );
+        self.tui.chord_starter = Some(key);
+    }
+
+    pub fn cancel_chord(&mut self) {
+        self.tui.chord_starter = None;
+    }
+
+    pub fn chord_starter(&self) -> Option<InputKey> {
+        self.tui.chord_starter
     }
 
     /// Tell the UI framework that your state changed and you need another layout pass.
@@ -1652,6 +1687,19 @@ impl<'a> Context<'a, '_> {
     /// consumes it if it is and returns true in that case.
     pub fn consume_shortcut(&mut self, shortcut: InputKey) -> bool {
         if !self.input_consumed && self.input_keyboard == Some(shortcut) {
+            self.set_input_consumed();
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn consume_chord(&mut self, start: InputKey, shortcut: InputKey) -> bool {
+        if !self.input_consumed
+            && self.tui.chord_starter == Some(start)
+            && self.input_keyboard == Some(shortcut)
+        {
+            self.tui.chord_starter = None;
             self.set_input_consumed();
             true
         } else {
